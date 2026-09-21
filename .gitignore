@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+chroma_db/
+data/synthetic/*.csv
+!data/synthetic/.gitkeep
+reports/fairness_*.json
+!reports/fairness_sample_*.json
+*.db
+.coverage
+htmlcov/
+.DS_Store

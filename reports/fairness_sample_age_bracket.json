@@ -1,0 +1,103 @@
+{
+  "group_by": "age_bracket",
+  "threshold": 0.1,
+  "generated_at": "2026-09-21T13:57:05.399857+00:00",
+  "products": [
+    {
+      "product_id": "high_yield_savings",
+      "rates": {
+        "45_59": 0.8048780487804879,
+        "30_44": 0.7631578947368421,
+        "under_30": 0.8387096774193549,
+        "60_plus": 0.775
+      },
+      "parity_diff": 0.0756,
+      "flagged": false,
+      "justified": false
+    },
+    {
+      "product_id": "mobile_check_deposit",
+      "rates": {
+        "45_59": 0.4634146341463415,
+        "30_44": 0.39473684210526316,
+        "under_30": 0.3548387096774194,
+        "60_plus": 0.4
+      },
+      "parity_diff": 0.1086,
+      "flagged": true,
+      "justified": false
+    },
+    {
+      "product_id": "overdraft_protection",
+      "rates": {
+        "45_59": 0.17073170731707318,
+        "30_44": 0.21052631578947367,
+        "under_30": 0.5483870967741935,
+        "60_plus": 0.2
+      },
+      "parity_diff": 0.3777,
+      "flagged": true,
+      "justified": false
+    },
+    {
+      "product_id": "personal_loan",
+      "rates": {
+        "45_59": 0.5609756097560976,
+        "30_44": 0.6578947368421053,
+        "under_30": 0.6451612903225806,
+        "60_plus": 0.675
+      },
+      "parity_diff": 0.114,
+      "flagged": true,
+      "justified": false
+    },
+    {
+      "product_id": "real_time_payments",
+      "rates": {
+        "45_59": 0.5609756097560976,
+        "30_44": 0.7105263157894737,
+        "under_30": 0.9032258064516129,
+        "60_plus": 0.575
+      },
+      "parity_diff": 0.3423,
+      "flagged": true,
+      "justified": false
+    },
+    {
+      "product_id": "retirement_ira",
+      "rates": {
+        "45_59": 0.7073170731707317,
+        "30_44": 0.6578947368421053,
+        "under_30": 0.0,
+        "60_plus": 0.85
+      },
+      "parity_diff": 0.85,
+      "flagged": true,
+      "justified": true
+    },
+    {
+      "product_id": "rewards_credit_card",
+      "rates": {
+        "45_59": 0.6097560975609756,
+        "30_44": 0.6578947368421053,
+        "under_30": 0.5161290322580645,
+        "60_plus": 0.45
+      },
+      "parity_diff": 0.2079,
+      "flagged": true,
+      "justified": false
+    },
+    {
+      "product_id": "student_loan_refinance",
+      "rates": {
+        "45_59": 0.0,
+        "30_44": 0.21052631578947367,
+        "under_30": 0.5806451612903226,
+        "60_plus": 0.0
+      },
+      "parity_diff": 0.5806,
+      "flagged": true,
+      "justified": true
+    }
+  ]
+}

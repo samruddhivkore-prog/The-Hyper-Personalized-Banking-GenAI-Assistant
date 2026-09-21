@@ -1,0 +1,111 @@
+{
+  "group_by": "income_bracket",
+  "threshold": 0.1,
+  "generated_at": "2026-09-21T13:57:05.401863+00:00",
+  "products": [
+    {
+      "product_id": "high_yield_savings",
+      "rates": {
+        "25k_50k": 0.8181818181818182,
+        "75k_100k": 0.6296296296296297,
+        "50k_75k": 0.8780487804878049,
+        "under_25k": 0.8333333333333334,
+        "100k_plus": 0.75
+      },
+      "parity_diff": 0.2484,
+      "flagged": true,
+      "justified": false
+    },
+    {
+      "product_id": "mobile_check_deposit",
+      "rates": {
+        "25k_50k": 0.4090909090909091,
+        "75k_100k": 0.4074074074074074,
+        "50k_75k": 0.3902439024390244,
+        "under_25k": 0.5,
+        "100k_plus": 0.35
+      },
+      "parity_diff": 0.15,
+      "flagged": true,
+      "justified": false
+    },
+    {
+      "product_id": "overdraft_protection",
+      "rates": {
+        "25k_50k": 0.29545454545454547,
+        "75k_100k": 0.2222222222222222,
+        "50k_75k": 0.2682926829268293,
+        "under_25k": 0.2777777777777778,
+        "100k_plus": 0.25
+      },
+      "parity_diff": 0.0732,
+      "flagged": false,
+      "justified": false
+    },
+    {
+      "product_id": "personal_loan",
+      "rates": {
+        "25k_50k": 0.7727272727272727,
+        "75k_100k": 0.7407407407407407,
+        "50k_75k": 0.6585365853658537,
+        "under_25k": 0.0,
+        "100k_plus": 0.7
+      },
+      "parity_diff": 0.7727,
+      "flagged": true,
+      "justified": true
+    },
+    {
+      "product_id": "real_time_payments",
+      "rates": {
+        "25k_50k": 0.7045454545454546,
+        "75k_100k": 0.5925925925925926,
+        "50k_75k": 0.6829268292682927,
+        "under_25k": 0.8333333333333334,
+        "100k_plus": 0.55
+      },
+      "parity_diff": 0.2833,
+      "flagged": true,
+      "justified": false
+    },
+    {
+      "product_id": "retirement_ira",
+      "rates": {
+        "25k_50k": 0.5,
+        "75k_100k": 0.5555555555555556,
+        "50k_75k": 0.6341463414634146,
+        "under_25k": 0.5,
+        "100k_plus": 0.8
+      },
+      "parity_diff": 0.3,
+      "flagged": true,
+      "justified": false
+    },
+    {
+      "product_id": "rewards_credit_card",
+      "rates": {
+        "25k_50k": 0.5227272727272727,
+        "75k_100k": 0.7777777777777778,
+        "50k_75k": 0.5853658536585366,
+        "under_25k": 0.0,
+        "100k_plus": 0.8
+      },
+      "parity_diff": 0.8,
+      "flagged": true,
+      "justified": true
+    },
+    {
+      "product_id": "student_loan_refinance",
+      "rates": {
+        "25k_50k": 0.18181818181818182,
+        "75k_100k": 0.18518518518518517,
+        "50k_75k": 0.12195121951219512,
+        "under_25k": 0.3888888888888889,
+        "100k_plus": 0.05
+      },
+      "parity_diff": 0.3389,
+      "flagged": true,
+      "justified": false
+    }
+  ]
+}
