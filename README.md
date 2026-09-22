@@ -251,8 +251,3 @@ built in. To deploy:
 - [x] Fairness report artifacts committed as real examples (`reports/fairness_sample_*.json`)
 - [ ] Live demo link — not deployed (see Deployment above)
 
-## Resume line
-
-*Built and (locally validated, deploy-ready) a RAG-grounded, fairness-audited
-hyper-personalization system for banking CRM — FastAPI + Postgres + Chroma,
-containerized, CI/CD via GitHub Actions.*
