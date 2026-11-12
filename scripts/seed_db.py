@@ -13,9 +13,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.database import SessionLocal, init_db
 from app.logging_config import configure_logging, get_logger
-from app.models import Customer, Transaction
+from app.models import Card, Customer, Transaction
 from app.services.offline_refresh import run_offline_refresh
-from scripts.generate_synthetic_customers import generate_customers
+from scripts.generate_synthetic_customers import generate_card, generate_customers
 
 logger = get_logger(__name__)
 
@@ -50,6 +50,15 @@ def seed(n: int = 300) -> None:
                             amount=t["amount"],
                         )
                     )
+                card = generate_card(p["customer_id"])
+                db.add(
+                    Card(
+                        card_id=card["card_id"],
+                        customer_id=card["customer_id"],
+                        last4=card["last4"],
+                        status=card["status"],
+                    )
+                )
             db.commit()
             logger.info("seed_complete", customers=n)
 

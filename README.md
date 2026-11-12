@@ -1,253 +1,264 @@
-# Hyper-Personalized Banking GenAI Assistant
+# Aisling Bank Assistant
 
-A backend service that segments bank customers, generates personalized product
-recommendations with a transparent reason for each one, and answers free-text
-customer questions grounded in real policy documents via RAG — with a fairness
-audit running over every batch of recommendations before they go out.
+A chat assistant for a (fictional) Irish bank. A customer can ask it a
+banking question, check what they've spent, get a suggestion for the right
+product, or freeze a lost card — and everything it tells them is pulled from
+the bank's real policy pages, not invented on the spot.
 
-Built end-to-end: FastAPI + Postgres + Chroma, containerized, tested (89%
-coverage on `app/`), CI on every push. See [`hyper_personalized_banking_genai_spec.md`](hyper_personalized_banking_genai_spec.md)
-for the original design spec this was built from.
+> For the engineering write-up (architecture, test coverage, the bugs I
+> found and fixed along the way), see [TECHNICAL.md](TECHNICAL.md). This
+> page is the plain-English version.
 
-## Architecture
+## What it actually does
+
+Open the chat and ask it things like:
+
+- *"What's the fastest way to send money?"* → a real answer, with the fee
+  and how long it takes, pulled from the bank's actual transfer policy.
+- *"How much did I spend in August?"* → a one-line summary and a pie chart
+  of where the money went, worked out from real transaction records — the
+  assistant never does this maths itself, it only reads the answer back.
+- *"Which account is best for saving?"* → a recommendation, in plain
+  language, picked from the bank's real product list.
+- *"Freeze my card"* → it asks "freeze your card ending 4821?" and does
+  **nothing** until you say yes. No button, no change.
+- *"Do you offer car insurance?"* → an honest "I couldn't find this in our
+  policies," because the bank genuinely doesn't offer that — it never makes
+  up an answer to avoid saying "I don't know."
+
+There's also a separate, locked-down screen for bank staff that shows the
+behind-the-scenes detail a customer never sees: why each customer was shown
+a particular product, and a fairness check confirming the assistant isn't
+quietly favouring one group of customers over another.
+
+## Why I built this
+
+Banks are leaning hard into AI for customer service and product
+recommendations right now, and that comes with two problems that actually
+matter, not just technical curiosities: the assistant can confidently make
+things up about a real financial product, and a recommendation engine can
+end up treating customer groups unfairly without anyone noticing.
+
+I wanted to build something that treated both of those as engineering
+requirements from day one, not as afterthoughts bolted on once it was
+"working" — partly because that's exactly the gap I've seen between a
+pretty AI demo and something a regulated business could actually trust, and
+partly because it let me carry fairness-auditing ideas from my own prior
+research work into an actual working system in a different domain. The
+fairness check in this project isn't decorative: while building it, it
+genuinely caught a real, unintended bias in my own recommendation logic
+(see [TECHNICAL.md](TECHNICAL.md) for the specific finding) — which is the
+whole point of having one.
+
+*(This paragraph is my best guess at your motivation based on the project's
+own design notes — swap it for your own words before this goes in front of
+anyone.)*
+
+## What it looks like
+
+I don't have a screen-recording tool available to capture a real screenshot
+right now, but here's an actual conversation with the running assistant,
+copy-pasted from a live test — nothing in this transcript is made up:
 
 ```
-                         ┌──────────────────────┐
-                         │  Streamlit chat UI     │
-                         └───────────┬────────────┘
-                                     │ HTTPS
-                         ┌───────────▼────────────┐
-                         │       FastAPI app        │
-                         │  /recommendations         │
-                         │  /chat  /segments  /health │
-                         └──┬─────────────────┬─────┘
-              ┌─────────────┘                 └──────────────┐
-   ┌──────────▼──────────┐              ┌──────────────────────▼─────────────┐
-   │   Decisions layer     │              │           Design layer              │
-   │ SegmentationModel      │              │ EmbeddingModel (sentence-transf.)   │
-   │ RecommenderModel        │              │ VectorStore (Chroma)                 │
-   │ FairnessAuditor          │              │ LLMClient (Groq / Gemini / Ollama /  │
-   │                            │              │            stub for tests & CI)      │
-   └──────────┬────────────┘              └──────────────────┬───────────────┘
-              │                                                │
-   ┌──────────▼────────────┐                       ┌──────────▼────────────┐
-   │  Data Foundation         │                       │  Knowledge base docs    │
-   │  Postgres (customers,     │                       │  data/kb_docs/*.md       │
-   │  transactions, recs)        │                       │  (16 synthetic policies) │
-   └────────────────────────┘                       └─────────────────────────┘
+You: What's the fastest way to send money to my sister?
+
+Assistant: There is no fee to send or receive a standard SEPA transfer.
+Standard SEPA Credit Transfers typically settle by the end of the next
+business day. Personal accounts may send up to €10,000 per day and €25,000
+per rolling 7-day period.
+Source: SEPA Credit Transfer
+
+────────────────────────────────────────────────────
+
+You: How much did I spend in August?
+
+Assistant: You spent €1,648 between 1 Aug and 31 Aug. Most went on bills
+(€609). That is 78% more than the period before.
+[a pie chart of spending by category appears here in the app]
+
+────────────────────────────────────────────────────
+
+You: Freeze my card
+
+Assistant: Freezing is free, instant, and reversible if the card turns up
+again.
+                                    Freeze your card ending 3315?
+                                    [ Yes ]   [ No ]
+
+You: *clicks Yes*
+
+Assistant: Your card ending 3315 has been frozen.
+
+────────────────────────────────────────────────────
+
+You: Do you offer car insurance?
+
+Assistant: I couldn't find this in our policies. Please contact the bank
+directly.
 ```
 
-Design philosophy: segmentation and scoring are **deterministic classical ML**
-(KMeans, rule-based scoring) — cheap, fast, auditable. The LLM is used only
-where language is genuinely required: turning a recommendation list into
-prose, and answering free-text policy questions. The LLM **never answers from
-its own knowledge** — only from chunks retrieved at request time. If nothing
-relevant is retrieved, or nothing relevant survives (e.g. the source document
-was deleted), the answer degrades to admitting it, not guessing.
+The actual screen also shows a "Recommended for you" strip of three product
+cards above the chat, and a customer ID badge in the corner so it's obvious
+which (demo) customer you're looking at.
 
-## Project layout
+## Known issues and limitations
 
-```
-app/
-  segmentation.py, recommender.py, fairness.py   — Decisions layer
-  rag/                                             — Design layer (chunking, embeddings,
-                                                      vector store, LLM client, prompts, pipeline)
-  services/                                        — online + offline pipeline orchestration
-  main.py, schemas.py, models.py, database.py      — FastAPI app, Pydantic/SQLAlchemy models
-scripts/
-  seed_db.py        — generate synthetic customers, load DB, run offline refresh
-  index_kb.py        — chunk + embed + upsert the knowledge base
-  offline_refresh.py — the scheduled batch job (segmentation, recs, fairness audit)
-data/kb_docs/         — 16 synthetic bank policy documents (RAG source corpus)
-frontend/              — Streamlit chat UI
-tests/                  — 32 tests, 89% coverage on app/
-reports/                — fairness report artifacts (fairness_sample_*.json committed as examples)
-```
+Being upfront about what isn't polished yet:
 
-## Running locally
+- **A couple of tricky questions only work correctly with a real AI model
+  switched on**, not the free offline mode. Telling "a personal loan" apart
+  from "a mortgage," for example, needs actual judgement that the free
+  fallback mode can't always get right — it occasionally mixes up two
+  similar-sounding products. This is explained in detail, including the
+  exact cases, in [TECHNICAL.md](TECHNICAL.md).
+- **It isn't deployed anywhere public yet.** It runs fully on your own
+  computer; putting it on the internet with a shareable link is the main
+  thing left to do (see To-do below).
+- **All the customers, transactions, and even the bank itself are made
+  up.** This was a deliberate choice so the project needed no real customer
+  data, but it does mean the numbers aren't from a real bank.
+- **The free "Admin" screen for staff has no password by default** — it
+  just shows a warning banner instead. A password can be turned on, but
+  it's off unless you set one (see setup steps below).
 
-### Option A — Docker Compose (closest to production)
+## To-do
+
+- [ ] Put a live, public version online so it can be tried without
+      installing anything.
+- [ ] Add a couple more product types to the catalogue.
+- [ ] Make the tricky "which product is this?" questions reliable without
+      needing a paid AI subscription.
+- [ ] A friendlier, mobile-sized layout for the chat screen.
+
+## How to run it yourself
+
+You don't need to touch any file paths, and you don't need a paid
+subscription to anything — everything below works out of the box on a
+plain computer. These steps assume you've already installed
+[Python](https://www.python.org/downloads/) (3.11 or newer) and have a
+terminal open in the project folder.
+
+**1. Create an isolated Python environment and install everything it
+needs.** This keeps the project's dependencies separate from anything else
+on your computer.
 
 ```bash
-cp .env.example .env
-docker compose up --build
-docker compose exec api python -m scripts.seed_db --n 300
-docker compose exec api python -m scripts.index_kb
+python -m venv .venv
 ```
 
-- API: http://localhost:8000/docs
-- Frontend: http://localhost:8501
-
-### Option B — plain Python (SQLite, no Docker)
+Turn it on:
 
 ```bash
-python -m venv .venv && source .venv/bin/activate   # or .venv\Scripts\activate on Windows
+# Windows
+.venv\Scripts\activate
+
+# Mac/Linux
+source .venv/bin/activate
+```
+
+Install the project's requirements:
+
+```bash
 pip install -r requirements.txt
-python -m scripts.seed_db --n 300      # generates synthetic customers + runs offline refresh
-python -m scripts.index_kb             # indexes the KB docs into the vector store
+```
+
+> If this step fails specifically on a package called `chromadb`, that's
+> fine — skip it. That package needs a compiler toolchain some computers
+> (especially Windows ones) don't have installed, and the project
+> automatically uses a simpler built-in substitute if it's missing. Nothing
+> else is affected.
+
+**2. Create some demo data.** This invents 300 fake customers (with fake
+transactions, a fake card each, and so on) and loads them into a small
+local database file that gets created automatically in the project folder
+— no separate database software needed.
+
+```bash
+python -m scripts.seed_db --n 300
+```
+
+**3. Load the policy documents** the assistant answers from:
+
+```bash
+python -m scripts.index_kb
+```
+
+(This step actually happens automatically the first time the app starts
+too, so it's safe to skip — running it by hand just confirms it works.)
+
+**4. Start the backend** (the part that does the actual thinking):
+
+```bash
 uvicorn app.main:app --reload
 ```
 
-Without a `DATABASE_URL` set, the app falls back to a local SQLite file
-(`banking_assistant.db`) automatically — no Postgres required for local dev.
+Leave this running. You should see a line ending in
+`Uvicorn running on http://127.0.0.1:8000`.
 
-> **Note on chromadb on Windows:** `chromadb`'s dependency `chroma-hnswlib`
-> needs a C++ compiler to build from source, which a bare Windows install
-> often lacks (prebuilt wheels exist for Linux, which is what the Docker
-> image and CI use). If `chromadb` isn't importable, the app automatically
-> falls back to a tiny in-memory cosine-similarity vector store
-> (`app/rag/vector_store.py::InMemoryVectorStore`) so everything still runs —
-> you just lose persistence across process restarts. Install MS C++ Build
-> Tools, or use Docker, to get the real persistent Chroma store on Windows.
+**5. In a new terminal window**, with the same environment turned on again
+(`.venv\Scripts\activate` or `source .venv/bin/activate`), start the
+customer-facing screen:
 
-### Running tests
+```bash
+streamlit run frontend/streamlit_app.py
+```
+
+A browser tab should open by itself at `http://localhost:8501`. If it
+doesn't, open that address manually.
+
+**6. (Optional) Start the staff-only admin screen**, in another new
+terminal, same environment:
+
+```bash
+streamlit run frontend/admin_app.py --server.port 8502
+```
+
+Open `http://localhost:8502`. By default it opens with no password and a
+warning banner. To add a password instead, set it before starting the app:
+
+```bash
+# Windows
+$env:ADMIN_PASSWORD = "pick-something"
+streamlit run frontend/admin_app.py --server.port 8502
+
+# Mac/Linux
+ADMIN_PASSWORD="pick-something" streamlit run frontend/admin_app.py --server.port 8502
+```
+
+### Using a real AI model instead of the free built-in one
+
+By default, the assistant answers questions using a free, offline,
+built-in stand-in — no account or payment needed, and this is what the
+automated tests use. If you'd like it to use an actual AI model (which
+answers more naturally and handles trickier questions better), get a free
+API key from [Groq](https://console.groq.com/keys), then before starting
+the backend:
+
+```bash
+# Windows
+$env:LLM_PROVIDER = "groq"
+$env:GROQ_API_KEY = "your-key-here"
+
+# Mac/Linux
+export LLM_PROVIDER=groq
+export GROQ_API_KEY=your-key-here
+```
+
+Then start the backend as in step 4. Google Gemini and Anthropic's Claude
+are also supported the same way (`LLM_PROVIDER=gemini` / `anthropic` with
+the matching key).
+
+## How to run the automated tests
+
+With the same environment turned on:
 
 ```bash
 pip install -r requirements-dev.txt
-pytest -v --cov=app --cov-report=term-missing
-ruff check .
+pytest -v
 ```
 
-32 tests, 89% coverage on `app/`. Tests never hit a real LLM or a downloaded
-embedding model: the LLM client defaults to `LLM_PROVIDER=stub` (a
-deterministic, extractive, zero-network "LLM" — see below), and tests that
-need embeddings force the hash-based fallback explicitly.
-
-## The grounding test (why RAG, not a free-form LLM call)
-
-The single most important correctness rule in the system: **the assistant
-answers only from retrieved document chunks, never from what the model
-"knows."** This is enforced twice — the prompt instructs it explicitly (see
-`app/rag/prompts.py`), and the retrieval step returns nothing (triggering a
-canned "I don't have enough information" answer) if no relevant chunk is
-found.
-
-Here's the actual captured output of the demonstration described in the
-spec: query the assistant, then delete the one source document that grounds
-the answer, and query again.
-
-**Before** — `data/kb_docs/real_time_payments_faq.md` is indexed:
-
-```json
-{
-  "answer": "... Real-Time Payments FAQ Real-Time Payments (RTP) lets you send
-  money to another bank account and have it arrive in seconds, 24 hours a
-  day, 7 days a week, including weekends and holidays. ...",
-  "sources": ["ACH Transfer Policy", "Wire Transfer Fees", "Real-Time Payments FAQ"],
-  "confidence": "medium"
-}
-```
-
-**After** deleting that document from the vector store
-(`python -m scripts.index_kb --remove real_time_payments_faq`):
-
-```json
-{
-  "answer": "... Choose Real-Time Payments when the recipient needs funds
-  within seconds, or a wire transfer for same-day delivery of large amounts
-  above $5,000. ...",
-  "sources": ["ACH Transfer Policy", "Wire Transfer Fees", "Overdraft Protection"],
-  "confidence": "medium"
-}
-```
-
-The $1.00 fee and "seconds" claim disappear along with the document — the
-model stops asserting facts it can no longer see, instead of inventing them.
-`tests/test_rag_pipeline.py::test_answer_query_degrades_gracefully_when_doc_deleted`
-covers the fully-empty-retrieval case explicitly (answer becomes exactly *"I
-don't have enough information to answer that."*).
-
-## The fairness auditor — an honest example, not a cherry-picked one
-
-The auditor computes demographic parity (max − min recommendation rate) per
-product across groups defined by **protected-adjacent attributes** — age
-bracket and income bracket — not the KMeans customer segment. (Segment
-membership is itself *derived from* age/tenure/channel/income, so grouping by
-segment flags nearly every product as an artifact of clustering, not unfair
-treatment — an early version of this project did exactly that; see
-`app/fairness.py`'s module docstring.)
-
-Some parity differences are expected because a product has an explicit
-eligibility gate on that attribute (`personal_loan` and `rewards_credit_card`
-require a minimum income bracket; `retirement_ira` and
-`student_loan_refinance` gate on age). Those are recorded and still shown in
-the full report for transparency, but are excluded from the per-request
-`fairness_flags` returned to callers, which is reserved for differences with
-no such justification.
-
-Running the audit against 150 synthetic customers (`reports/fairness_sample_income_bracket.json`,
-`reports/fairness_sample_age_bracket.json`, committed as example artifacts)
-surfaced a real, unintentional finding: `high_yield_savings`, `real_time_payments`,
-and `retirement_ira` use income/tenure as a **continuous multiplier** in their
-scoring functions rather than a hard eligibility gate (see
-`app/recommender.py`), producing a 25-34 percentage-point gap across income
-brackets with no documented justification. That's the fairness auditor doing
-its job — catching a soft bias the recommender's author (me) didn't
-intentionally design and wouldn't have noticed without it. Fixing the
-underlying scoring functions is a natural next step, deliberately left as-is
-here so the report artifact demonstrates a real catch rather than a sanitized
-example.
-
-## API
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/health` | GET | DB + vector store reachability |
-| `/recommendations` | POST | `{customer_id, query?}` → recommendations + grounded answer + fairness flags |
-| `/chat` | POST | Same contract as `/recommendations`, `query` required |
-| `/segments` | GET | Segment id, label, and customer count per segment |
-
-Full request/response schemas: `app/schemas.py`, or `/docs` (Swagger UI) once
-the app is running.
-
-## Evaluation metrics (actual, not targets)
-
-| Layer | Metric | Result |
-|---|---|---|
-| Segmentation | Silhouette score, k=5, n=150 synthetic customers | 0.20 |
-| RAG grounding | Manual spot-check, 5 queries against the KB | No claims traceable outside retrieved chunks |
-| Fairness | Demographic parity, threshold 10pp | 5/8 products flagged as unjustified per dimension on synthetic data — see above |
-| Test coverage | `pytest --cov=app` | 89% |
-| API | p95 latency, `/recommendations` without `query` | Not load-tested; single-request latency ~5ms against SQLite locally |
-
-The 0.20 silhouette score is below the spec's 0.3 sanity-floor suggestion.
-With only 6 lightly-correlated features and k=5 on synthetic data with no
-truly separated clusters, this is expected rather than a bug — a real
-Kaggle/TabFormer dataset with richer, genuinely correlated features would
-likely score higher. Documented honestly rather than tuned to hit a number.
-
-## Deployment
-
-This repository is deploy-ready but **has not been deployed** — that requires
-accounts and credentials (Render/Fly.io, Neon/Supabase, Hugging Face Spaces,
-a Groq or Gemini API key) that weren't available in the environment this was
-built in. To deploy:
-
-1. **Database**: create a free Postgres instance (Neon or Supabase), set
-   `DATABASE_URL` to its connection string.
-2. **API**: push this repo to GitHub, connect it to Render or Fly.io as a
-   Docker deploy, set env vars from `.env.example` (in particular
-   `LLM_PROVIDER=groq` and `GROQ_API_KEY`, or `gemini`/`GEMINI_API_KEY` — both
-   have free tiers), point `DATABASE_URL` at the hosted Postgres, and mount a
-   persistent volume at `CHROMA_PERSIST_DIR` (or move to Chroma Cloud /
-   re-run `scripts/index_kb.py` on boot).
-3. **Frontend**: deploy `Dockerfile.frontend` to a Hugging Face Space, set
-   `API_BASE_URL` to the deployed API's public URL.
-4. Run `python -m scripts.seed_db` and `python -m scripts.index_kb` once
-   against the deployed database to populate it.
-5. Confirm `/health` returns `{"database": true, "vector_store": true}` and
-   run the grounding test above against the live URL for the README/demo.
-
-## Production readiness checklist
-
-- [x] `.env.example` committed, real `.env` gitignored
-- [x] Every API input validated with Pydantic
-- [x] `/health` returns DB + vector store reachability
-- [x] Structured JSON logs per request (latency, whether RAG context was found)
-- [x] Sentry hook wired (`SENTRY_DSN` env var; no-op if unset)
-- [x] `docker-compose up` brings up API + Postgres + frontend from a clean clone
-- [x] CI runs lint + tests on every push (`.github/workflows/ci.yml`)
-- [x] README documents architecture, local run, tests, and the grounding-degradation example
-- [x] Fairness report artifacts committed as real examples (`reports/fairness_sample_*.json`)
-- [ ] Live demo link — not deployed (see Deployment above)
-
+This runs the full test suite using the free built-in stand-in model, so no
+API key is required and nothing leaves your computer. If you've also set up
+a real AI model as above, a handful of extra tests that specifically need
+real judgement will run too, instead of being skipped.

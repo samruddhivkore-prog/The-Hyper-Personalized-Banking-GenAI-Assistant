@@ -29,12 +29,42 @@ class RecommendationOut(BaseModel):
     product: str
     score: float
     reason_code: str
+    plain_text: str  # customer-facing sentence — see app/services/copy.py
+    learn_more: str  # customer-facing product blurb — see app/services/copy.py
+
+
+class PendingAction(BaseModel):
+    action: str  # "freeze_card" | "unfreeze_card"
+    card_id: str
+    last4: str
+    message: str  # e.g. "Freeze your card ending 4821?"
+
+
+class CategoryAmount(BaseModel):
+    category: str
+    amount: float
+    pct: float
+
+
+class SpendingData(BaseModel):
+    period_label: str
+    start: str
+    end: str
+    total: float
+    categories: list[CategoryAmount] = Field(default_factory=list)
+    top_categories: list[str] = Field(default_factory=list)
+    previous_total: float | None = None
+    change_pct: float | None = None
+    has_data: bool = True
 
 
 class AssistantResponse(BaseModel):
     answer: str
     sources: list[str] = Field(default_factory=list)
-    confidence: str  # "high" | "medium" | "low" | "none"
+    confidence: str  # "high" | "medium" | "none"
+    retrieved_chunks: list[str] = Field(default_factory=list)  # admin-only debugging info
+    pending_action: PendingAction | None = None  # set when a card action needs Yes/No confirmation
+    spending_data: SpendingData | None = None  # set when the question was a spending lookup
 
 
 class RecommendationResponse(BaseModel):
@@ -61,3 +91,40 @@ class HealthResponse(BaseModel):
     status: str
     database: bool
     vector_store: bool
+
+
+class SpendingResponse(BaseModel):
+    customer_id: str
+    period_label: str
+    start: str
+    end: str
+    total: float
+    categories: list[CategoryAmount] = Field(default_factory=list)
+    top_categories: list[str] = Field(default_factory=list)
+    previous_total: float | None = None
+    change_pct: float | None = None
+    has_data: bool
+    sentence: str
+
+
+class CardActionRequest(BaseModel):
+    customer_id: str
+    card_id: str
+
+
+class CardActionResponse(BaseModel):
+    ok: bool
+    message: str
+    status: str | None = None
+
+
+class ActionLogOut(BaseModel):
+    customer_id: str
+    action: str
+    status: str
+    details: str
+    created_at: datetime
+
+
+class AdminStatusOut(BaseModel):
+    llm_provider: str

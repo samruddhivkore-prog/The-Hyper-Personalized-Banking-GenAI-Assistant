@@ -25,6 +25,8 @@ def _title_from_filename(path: Path) -> str:
 def load_kb_docs() -> list[dict]:
     docs = []
     for path in sorted(KB_DIR.glob("*.md")):
+        if path.name == "README.md":
+            continue
         text = path.read_text(encoding="utf-8")
         # first markdown heading, if present, makes a nicer source title
         first_line = text.strip().splitlines()[0] if text.strip() else ""

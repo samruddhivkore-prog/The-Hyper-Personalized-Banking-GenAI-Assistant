@@ -1,14 +1,15 @@
-"""Pluggable LLM client. Provider selected by settings.llm_provider:
-
-- stub    : deterministic, extractive, zero-network answer built only from the
-            retrieved context. Used by default, in tests, and in CI so the
-            grounding contract is verifiable without an API key.
-- groq    : Groq free tier (Llama 3.1) — used for the deployed demo.
-- gemini  : Google Gemini free tier — alternative deployed-demo provider.
-- ollama  : local model — used during development to avoid burning API quota.
+"""Pluggable LLM client. Provider is chosen by the LLM_PROVIDER env var
+(groq | gemini | anthropic | ollama | stub). Each provider's API key comes
+from its own env var (GROQ_API_KEY / GEMINI_API_KEY / ANTHROPIC_API_KEY); if
+the chosen provider has no key set, get_llm_client() falls back to the
+deterministic, extractive, zero-network stub rather than erroring — this is
+also what tests/CI use, so the grounding contract is verifiable without any
+API key. LLM_MODEL overrides a provider's default model name if set.
 
 Every backend implements the same generate() contract so the RAG pipeline
-(app/rag/pipeline.py) is provider-agnostic.
+(app/rag/pipeline.py) is provider-agnostic, and each retries once on a
+transient error before raising — app/rag/pipeline.py turns that into a
+friendly message rather than a crash.
 """
 import re
 from abc import ABC, abstractmethod
@@ -16,17 +17,8 @@ from abc import ABC, abstractmethod
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import get_settings
-
-_STOPWORDS = {
-    "the", "a", "an", "is", "are", "to", "of", "for", "and", "or", "what",
-    "how", "do", "i", "my", "in", "on", "with", "can", "does", "it", "this",
-    "that", "you", "your", "be", "was", "were", "fastest", "way",
-}
-
-
-def _keywords(text: str) -> set[str]:
-    tokens = re.findall(r"[a-z0-9]+", text.lower())
-    return {t for t in tokens if t not in _STOPWORDS and len(t) > 2}
+from app.rag.extraction import extract_best_sentences
+from app.rag.prompts import NOT_FOUND_MESSAGE
 
 
 class LLMClient(ABC):
@@ -36,33 +28,44 @@ class LLMClient(ABC):
 
 
 class StubLLMClient(LLMClient):
-    """Extractive, no-network 'LLM'. Never emits text absent from context_chunks
-    (beyond fixed connective phrasing), which makes the no-hallucination
-    contract mechanically testable."""
+    """Extractive, no-network 'LLM'. Never emits text absent from
+    context_chunks, which makes the no-hallucination contract mechanically
+    testable. Used directly here only when called standalone (e.g. tests);
+    app/rag/pipeline.py calls app.rag.extraction directly instead, so it can
+    track which source document each picked sentence came from."""
 
     def generate(self, prompt: str, context_chunks: list[str], temperature: float = 0.2) -> str:
         if not context_chunks:
-            return "I don't have enough information to answer that."
+            return NOT_FOUND_MESSAGE
 
         query_match = re.search(r"Question:\s*(.*)", prompt)
         query = query_match.group(1).strip() if query_match else ""
-        q_keywords = _keywords(query)
 
-        sentences: list[tuple[str, int]] = []
+        picked: list[str] = []
         for chunk in context_chunks:
-            for sent in re.split(r"(?<=[.!?])\s+", chunk.strip()):
-                sent = sent.strip()
-                if not sent:
-                    continue
-                overlap = len(_keywords(sent) & q_keywords)
-                sentences.append((sent, overlap))
+            if len(picked) >= 3:
+                break
+            picked.extend(extract_best_sentences(query, chunk, max_sentences=3 - len(picked)))
 
-        sentences.sort(key=lambda s: s[1], reverse=True)
-        top = [s for s, score in sentences if score > 0][:3]
-        if not top:
-            top = [s for s, _ in sentences[:2]]
+        return " ".join(picked) if picked else NOT_FOUND_MESSAGE
 
-        return " ".join(top)
+
+class AnthropicLLMClient(LLMClient):
+    def __init__(self, api_key: str, model: str):
+        from anthropic import Anthropic
+
+        self._client = Anthropic(api_key=api_key)
+        self._model = model
+
+    @retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=1, min=1, max=8))
+    def generate(self, prompt: str, context_chunks: list[str], temperature: float = 0.0) -> str:
+        response = self._client.messages.create(
+            model=self._model,
+            max_tokens=300,
+            temperature=temperature,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return "".join(block.text for block in response.content if block.type == "text")
 
 
 class GroqLLMClient(LLMClient):
@@ -72,7 +75,7 @@ class GroqLLMClient(LLMClient):
         self._client = Groq(api_key=api_key)
         self._model = model
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=8))
+    @retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=1, min=1, max=8))
     def generate(self, prompt: str, context_chunks: list[str], temperature: float = 0.2) -> str:
         completion = self._client.chat.completions.create(
             model=self._model,
@@ -89,7 +92,7 @@ class GeminiLLMClient(LLMClient):
         genai.configure(api_key=api_key)
         self._model = genai.GenerativeModel(model)
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=8))
+    @retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=1, min=1, max=8))
     def generate(self, prompt: str, context_chunks: list[str], temperature: float = 0.2) -> str:
         response = self._model.generate_content(
             prompt, generation_config={"temperature": temperature}
@@ -116,13 +119,30 @@ class OllamaLLMClient(LLMClient):
         return resp.json()["response"]
 
 
+def describe_llm_provider() -> str:
+    """Human-readable line for the startup log and the admin app — never
+    raises, since it must be safe to call before any provider is constructed."""
+    settings = get_settings()
+    provider = settings.llm_provider.lower()
+    has_key = {
+        "groq": bool(settings.groq_api_key),
+        "gemini": bool(settings.gemini_api_key),
+        "anthropic": bool(settings.anthropic_api_key),
+    }
+    if provider in has_key and has_key[provider]:
+        return provider
+    return "stub fallback (no API key)"
+
+
 def get_llm_client() -> LLMClient:
     settings = get_settings()
     provider = settings.llm_provider.lower()
     if provider == "groq" and settings.groq_api_key:
-        return GroqLLMClient(settings.groq_api_key, settings.groq_model)
+        return GroqLLMClient(settings.groq_api_key, settings.llm_model or settings.groq_model)
     if provider == "gemini" and settings.gemini_api_key:
-        return GeminiLLMClient(settings.gemini_api_key, settings.gemini_model)
+        return GeminiLLMClient(settings.gemini_api_key, settings.llm_model or settings.gemini_model)
+    if provider == "anthropic" and settings.anthropic_api_key:
+        return AnthropicLLMClient(settings.anthropic_api_key, settings.llm_model or settings.anthropic_model)
     if provider == "ollama":
-        return OllamaLLMClient(settings.ollama_host, settings.ollama_model)
+        return OllamaLLMClient(settings.ollama_host, settings.llm_model or settings.ollama_model)
     return StubLLMClient()

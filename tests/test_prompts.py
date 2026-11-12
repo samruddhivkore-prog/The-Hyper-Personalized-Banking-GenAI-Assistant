@@ -1,60 +1,46 @@
-import re
-
+from app.rag.extraction import extract_best_sentences
 from app.rag.llm_client import StubLLMClient
-from app.rag.prompts import build_prompt
+from app.rag.prompts import NOT_FOUND_MESSAGE, build_prompt
 
 
-def test_build_prompt_includes_all_sections():
+def test_build_prompt_includes_instruction_context_and_question():
     prompt = build_prompt(
-        segment="digital_first_young_professional",
-        recommendations=[
-            {"product": "Real-Time Payments", "score": 0.92, "reason_code": "high_transfer_frequency"}
-        ],
-        retrieved_chunks=["Real-Time Payments costs $1.00 per transfer."],
-        query="What's the fastest way to send $2,000?",
+        context_chunks=["Real-Time Payments costs €1.00 per transfer."],
+        query="What's the fastest way to send €2,000?",
     )
-    assert "digital_first_young_professional" in prompt
-    assert "Real-Time Payments" in prompt
-    assert "high_transfer_frequency" in prompt
-    assert "$1.00 per transfer" in prompt
-    assert "What's the fastest way to send $2,000?" in prompt
-    assert "Answer ONLY using the CONTEXT" in prompt
+    assert "2-3 short plain sentences" in prompt
+    assert "using ONLY the text below" in prompt
+    assert NOT_FOUND_MESSAGE in prompt
+    assert "€1.00 per transfer" in prompt
+    assert "What's the fastest way to send €2,000?" in prompt
 
 
-def test_build_prompt_handles_no_recommendations_and_no_context():
-    prompt = build_prompt(segment=None, recommendations=[], retrieved_chunks=[], query="hello")
-    assert "(none)" in prompt
-    assert "(no relevant context retrieved)" in prompt
-    assert "unknown" in prompt
+def test_build_prompt_handles_no_context():
+    prompt = build_prompt(context_chunks=[], query="hello")
+    assert "(no relevant text)" in prompt
 
 
-def _words(text: str) -> set[str]:
-    return set(re.findall(r"[a-z0-9]+", text.lower()))
+def test_extract_best_sentences_only_uses_words_from_the_text():
+    import re
 
-
-def test_stub_llm_never_invents_words_outside_context():
-    context = [
-        "Real-Time Payments costs a flat fee of $1.00 per transfer and arrives within seconds.",
-        "Wire transfers cost $25.00 and arrive same-day during business hours.",
-    ]
-    prompt = build_prompt(
-        segment="digital_first",
-        recommendations=[],
-        retrieved_chunks=context,
-        query="What's the fastest way to send $2,000 to my sister's account?",
+    text = (
+        "Real-Time Payments costs a flat fee of €1.00 per transfer and arrives "
+        "within seconds. Wire transfers cost €25.00 and arrive same-day."
     )
-    llm = StubLLMClient()
-    answer = llm.generate(prompt, context_chunks=context)
+    picked = extract_best_sentences("What's the fastest way to send money?", text, max_sentences=3)
+    assert picked
 
-    context_words = set()
-    for chunk in context:
-        context_words |= _words(chunk)
-    answer_words = _words(answer)
+    text_words = set(re.findall(r"[a-z0-9]+", text.lower()))
+    for sentence in picked:
+        sentence_words = set(re.findall(r"[a-z0-9]+", sentence.lower()))
+        assert sentence_words.issubset(text_words)
 
-    assert answer_words.issubset(context_words)
+
+def test_extract_best_sentences_empty_text_returns_nothing():
+    assert extract_best_sentences("anything", "", max_sentences=3) == []
 
 
 def test_stub_llm_says_it_does_not_know_with_empty_context():
     llm = StubLLMClient()
-    answer = llm.generate("irrelevant prompt", context_chunks=[])
-    assert "don't have enough information" in answer.lower()
+    answer = llm.generate("Question: anything\nAnswer:", context_chunks=[])
+    assert answer == NOT_FOUND_MESSAGE

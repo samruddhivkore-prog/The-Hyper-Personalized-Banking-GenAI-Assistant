@@ -20,11 +20,11 @@ from datetime import datetime, timezone
 from typing import Any
 
 # product_id -> the attribute its scoring function explicitly gates on, by
-# dimension. See app/recommender.py: score_retirement_ira (age >= 30),
+# dimension. See app/recommender.py: score_pension_prsa (age >= 30),
 # score_student_loan_refinance (age <= 35), score_personal_loan and
 # score_rewards_credit_card (income_rank >= 1).
 JUSTIFIED_PRODUCTS: dict[str, set[str]] = {
-    "age_bracket": {"retirement_ira", "student_loan_refinance"},
+    "age_bracket": {"pension_prsa", "student_loan_refinance"},
     "income_bracket": {"personal_loan", "rewards_credit_card"},
 }
 

@@ -76,10 +76,10 @@ def score_personal_loan(profile: dict) -> tuple[float, str] | None:
     return round(score, 2), "established_tenure_eligible_income"
 
 
-def score_mobile_check_deposit(profile: dict) -> tuple[float, str] | None:
+def score_mobile_cheque_deposit(profile: dict) -> tuple[float, str] | None:
     if profile.get("channel_preference") not in ("mobile", "web"):
         return None
-    if _has_product(profile, "mobile_check_deposit"):
+    if _has_product(profile, "mobile_cheque_deposit"):
         return None
     return 0.55, "digital_channel_preference"
 
@@ -101,10 +101,10 @@ def score_student_loan_refinance(profile: dict) -> tuple[float, str] | None:
     return 0.5, "young_customer_debt_optimization"
 
 
-def score_retirement_ira(profile: dict) -> tuple[float, str] | None:
+def score_pension_prsa(profile: dict) -> tuple[float, str] | None:
     if profile.get("age", 0) < 30:
         return None
-    if _has_product(profile, "retirement_ira"):
+    if _has_product(profile, "pension_prsa"):
         return None
     score = min(1.0, 0.4 + (profile["age"] - 30) / 100 + _income_rank(profile) * 0.05)
     return round(score, 2), "long_term_wealth_building_age_appropriate"
@@ -115,10 +115,10 @@ CATALOG: list[Product] = [
     Product("high_yield_savings", "High-Yield Savings", "savings", score_high_yield_savings),
     Product("rewards_credit_card", "Rewards Credit Card", "credit", score_rewards_credit_card),
     Product("personal_loan", "Personal Loan", "lending", score_personal_loan),
-    Product("mobile_check_deposit", "Mobile Check Deposit", "servicing", score_mobile_check_deposit),
+    Product("mobile_cheque_deposit", "Mobile Cheque Deposit", "servicing", score_mobile_cheque_deposit),
     Product("overdraft_protection", "Overdraft Protection", "servicing", score_overdraft_protection),
     Product("student_loan_refinance", "Student Loan Refinance", "lending", score_student_loan_refinance),
-    Product("retirement_ira", "Retirement IRA", "investing", score_retirement_ira),
+    Product("pension_prsa", "Pension (PRSA)", "investing", score_pension_prsa),
 ]
 
 

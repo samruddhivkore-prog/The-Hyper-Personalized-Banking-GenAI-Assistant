@@ -1,41 +1,21 @@
-"""Prompt construction. The strict grounding instruction here is the single
-most important correctness rule in the system: the model must answer only
-from CONTEXT and the recommendation reason codes, and say so when it can't."""
+"""Prompt construction for a real LLM provider (Anthropic/Groq/Gemini/Ollama).
+The stub provider (app/rag/extraction.py) does not use this — it's
+extractive, not generative — but shares the same NOT_FOUND_MESSAGE so both
+paths degrade identically from a customer's point of view."""
 
-SYSTEM_INSTRUCTION = (
-    "You are a banking assistant. Answer ONLY using the CONTEXT below.\n"
-    "If the CONTEXT does not contain the answer, say you don't have enough information.\n"
-    "Do not mention products or facts that are not in the CONTEXT."
+NOT_FOUND_MESSAGE = "I couldn't find this in our policies. Please contact the bank directly."
+
+INSTRUCTION = (
+    "Answer the customer's question in 2-3 short plain sentences, using ONLY the text below. "
+    "Answer the exact question first. Give numbers (fee, limit, time) only if they appear in "
+    "the text. If the text does not directly answer the question, reply exactly: "
+    + NOT_FOUND_MESSAGE
+    + " A related but different product does not count as an answer (a personal loan is not a "
+    "mortgage). If several methods exist and the customer asks for the fastest or cheapest, "
+    "pick that one. No markdown, no headings, no bullet points."
 )
 
 
-def format_recommendations(recommendations: list[dict]) -> str:
-    if not recommendations:
-        return "(none)"
-    lines = [
-        f"- {r['product']} (score={r['score']}, reason={r['reason_code']})"
-        for r in recommendations
-    ]
-    return "\n".join(lines)
-
-
-def format_context(chunks: list[str]) -> str:
-    if not chunks:
-        return "(no relevant context retrieved)"
-    return "\n\n---\n\n".join(chunks)
-
-
-def build_prompt(
-    segment: str | None,
-    recommendations: list[dict],
-    retrieved_chunks: list[str],
-    query: str,
-) -> str:
-    return (
-        f"System: {SYSTEM_INSTRUCTION}\n\n"
-        f"Customer segment: {segment or 'unknown'}\n"
-        f"Relevant recommendations for this customer:\n{format_recommendations(recommendations)}\n\n"
-        f"CONTEXT:\n{format_context(retrieved_chunks)}\n\n"
-        f"Question: {query}\n"
-        f"Answer:"
-    )
+def build_prompt(context_chunks: list[str], query: str) -> str:
+    context = "\n\n---\n\n".join(context_chunks) if context_chunks else "(no relevant text)"
+    return f"{INSTRUCTION}\n\nTEXT:\n{context}\n\nQuestion: {query}\nAnswer:"

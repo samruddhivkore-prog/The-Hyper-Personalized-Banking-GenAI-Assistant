@@ -1,31 +1,3 @@
-# Data Privacy Policy
+# Data Privacy
 
-This document summarizes how customer data is used for personalization and
-recommendations within the bank's digital products.
-
-## What data is used for recommendations
-Personalized product recommendations are generated using account tenure, product
-holdings, transaction category and frequency (not individual transaction content),
-income bracket, and channel preference. Individual transaction descriptions and
-merchant names are not used to generate recommendations.
-
-## Opting out of personalization
-Customers can disable personalized recommendations at any time under Settings >
-Privacy > Personalization. Opting out stops new personalized recommendations from
-being generated but does not affect standard account statements or required
-regulatory communications.
-
-## Fairness monitoring
-Recommendation patterns are periodically reviewed to check that products are not
-being disproportionately recommended to one customer segment over another without an
-eligibility-based justification. Flagged patterns are reviewed by the product team
-before any related recommendations are sent to customers.
-
-## Data retention
-Interaction logs, including which recommendations were shown and what questions were
-asked of the assistant, are retained for 24 months for quality and compliance review,
-then deleted unless required to be retained longer by law.
-
-## Sharing with third parties
-Customer data used for personalization is not sold to third parties. It may be
-shared with regulators or auditors as required by applicable banking law.
+This note explains how Aisling Bank uses customer data to personalise recommendations. Personalised recommendations are generated from account tenure, products already held, how often and in which category a customer transacts, income band, and channel preference; individual transaction descriptions and merchant names are not used. A customer can turn personalised recommendations off at any time under Privacy > Personalisation in the mobile app; required regulatory communications and statements continue regardless. Recommendation patterns are reviewed periodically to confirm that a product is not being recommended unevenly across customer groups without an eligibility reason, and any flagged pattern is reviewed by the product team before related recommendations go out. Records of recommendations shown and questions asked of the assistant are kept for 24 months for quality and compliance review, then deleted unless the law requires longer retention. Customer data used for personalisation is never sold to third parties and is shared only with regulators or auditors where required by law.

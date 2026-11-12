@@ -78,6 +78,26 @@ class Recommendation(Base):
     customer: Mapped["Customer"] = relationship(back_populates="recommendations")
 
 
+class Card(Base):
+    __tablename__ = "cards"
+
+    card_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    customer_id: Mapped[str] = mapped_column(ForeignKey("customers.customer_id"))
+    last4: Mapped[str] = mapped_column(String(4))
+    status: Mapped[str] = mapped_column(String(16), default="active")  # active | frozen
+
+
+class ActionLog(Base):
+    __tablename__ = "actions_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    customer_id: Mapped[str] = mapped_column(String(32))
+    action: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(32))
+    details: Mapped[str] = mapped_column(String(256), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+
 class InteractionLog(Base):
     __tablename__ = "interaction_logs"
 

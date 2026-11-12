@@ -1,16 +1,12 @@
-"""Default (no-query) summary template — used when a request omits `query`."""
+"""Default (no-query) summary template — used when a request omits `query`.
+
+Deliberately does NOT list products or name a top pick: recommendations are
+shown once, as cards, by the frontend. Repeating them here was the actual
+cause of "recommendations appear twice" — see app/services/recommendation_service.py.
+"""
 
 
 def render_default_summary(profile: dict, recommendations: list[dict]) -> str:
-    name_bit = f"customer {profile.get('customer_id', '')}".strip()
     if not recommendations:
-        return f"Hi {name_bit}, we don't have any new personalized recommendations for you right now."
-
-    top = recommendations[0]
-    lines = [f"Hi {name_bit}, here are your top personalized recommendations:"]
-    for rec in recommendations:
-        lines.append(f"- {rec['product']} (reason: {rec['reason_code'].replace('_', ' ')})")
-    lines.append(
-        f"\nWe think {top['product']} is your best next step based on your recent activity."
-    )
-    return "\n".join(lines)
+        return "We don't have any new recommendations for you right now."
+    return "Here are a few things we think could help, based on your account."

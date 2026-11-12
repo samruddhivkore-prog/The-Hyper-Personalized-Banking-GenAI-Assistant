@@ -15,12 +15,21 @@ PRODUCTS = [
     "high_yield_savings",
     "rewards_credit_card",
     "personal_loan",
-    "mobile_check_deposit",
+    "mobile_cheque_deposit",
     "overdraft_protection",
     "student_loan_refinance",
-    "retirement_ira",
+    "pension_prsa",
 ]
-TXN_CATEGORIES = ["transfer", "bill_pay", "grocery", "dining", "subscription", "atm_withdrawal", "deposit"]
+SPENDING_CATEGORIES = ["groceries", "transport", "dining", "bills", "shopping", "other"]
+_CATEGORY_WEIGHTS = [0.30, 0.15, 0.15, 0.20, 0.15, 0.05]
+_CATEGORY_AMOUNT_RANGE = {
+    "groceries": (15, 120),
+    "transport": (5, 60),
+    "dining": (10, 90),
+    "bills": (30, 220),
+    "shopping": (10, 200),
+    "other": (5, 80),
+}
 
 # Weighted so segments emerge naturally from correlated attributes rather than
 # being forced, e.g. younger + digital-first customers transact more often.
@@ -37,18 +46,25 @@ def _pick_income(age: int) -> str:
     return random.choices(INCOME_BRACKETS, weights=weights)[0]
 
 
-def _generate_transactions(n: int) -> list[dict]:
+def _generate_transactions(monthly_count: int, months_back: int = 12) -> list[dict]:
+    """Spreads roughly `monthly_count` transactions per month over the last
+    `months_back` months, so a spending lookup for any recent month —
+    not just the most recent 30 days — has real data behind it."""
     today = datetime.now(timezone.utc)
     txns = []
-    for _ in range(min(n, 5)):
-        days_ago = random.randint(0, 30)
-        txns.append(
-            {
-                "date": (today - timedelta(days=days_ago)).strftime("%Y-%m-%d"),
-                "category": random.choice(TXN_CATEGORIES),
-                "amount": round(random.uniform(5, 500), 2),
-            }
-        )
+    per_month = max(2, min(int(monthly_count), 15))
+    for month_offset in range(months_back):
+        for _ in range(per_month):
+            days_ago = month_offset * 30 + random.randint(0, 29)
+            category = random.choices(SPENDING_CATEGORIES, weights=_CATEGORY_WEIGHTS)[0]
+            lo, hi = _CATEGORY_AMOUNT_RANGE[category]
+            txns.append(
+                {
+                    "date": (today - timedelta(days=days_ago)).strftime("%Y-%m-%d"),
+                    "category": category,
+                    "amount": round(random.uniform(lo, hi), 2),
+                }
+            )
     return txns
 
 
@@ -82,6 +98,11 @@ def generate_customer(index: int) -> dict:
         "avg_monthly_transactions": avg_monthly_transactions,
         "recent_transactions": _generate_transactions(int(avg_monthly_transactions)),
     }
+
+
+def generate_card(customer_id: str) -> dict:
+    last4 = f"{random.randint(0, 9999):04d}"
+    return {"card_id": f"CARD-{customer_id}", "customer_id": customer_id, "last4": last4, "status": "active"}
 
 
 def generate_customers(n: int, seed: int | None = 42) -> list[dict]:

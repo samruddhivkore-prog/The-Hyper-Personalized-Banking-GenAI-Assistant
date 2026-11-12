@@ -15,3 +15,5 @@ reports/fairness_*.json
 .coverage
 htmlcov/
 .DS_Store
+api.txt
+*.mp4

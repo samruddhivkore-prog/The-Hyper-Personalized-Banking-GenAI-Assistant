@@ -3,8 +3,15 @@
 Chunks are sized in words (a rough proxy for the ~300-500 token target in the
 spec — good enough for short synthetic policy docs) with overlap so that
 facts spanning a chunk boundary aren't lost.
+
+Markdown is stripped from the full document BEFORE splitting into words —
+not after. Chunking joins words with single spaces, which destroys the line
+structure a line-anchored "strip the # at the start of a line" rule needs;
+stripping post-chunk leaves stray "#"/"##" tokens stranded mid-sentence.
 """
 from dataclasses import dataclass
+
+from app.rag.markdown_clean import strip_markdown
 
 
 @dataclass
@@ -22,7 +29,7 @@ def chunk_document(
     chunk_size_words: int = 220,
     overlap_words: int = 40,
 ) -> list[Chunk]:
-    words = text.split()
+    words = strip_markdown(text).split()
     if not words:
         return []
 

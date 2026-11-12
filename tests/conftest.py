@@ -14,7 +14,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
-from app.models import Customer
+from app.models import Card, Customer
 
 TEST_ENGINE = create_engine(
     "sqlite:///:memory:",
@@ -77,3 +77,41 @@ def seeded_customer(db_session, sample_profile) -> Customer:
     db_session.add(customer)
     db_session.commit()
     return customer
+
+
+@pytest.fixture()
+def second_customer(db_session) -> Customer:
+    customer = Customer(
+        customer_id="CUST00002",
+        age=40,
+        income_bracket="75k_100k",
+        account_tenure_months=60,
+        products_held=["checking"],
+        channel_preference="branch",
+        avg_monthly_transactions=10,
+        segment_id=1,
+        segment_label="branch_oriented_mid_career",
+    )
+    db_session.add(customer)
+    db_session.commit()
+    return customer
+
+
+@pytest.fixture()
+def seeded_card(db_session, seeded_customer) -> Card:
+    card = Card(
+        card_id="CARD-CUST00001", customer_id=seeded_customer.customer_id, last4="4821", status="active"
+    )
+    db_session.add(card)
+    db_session.commit()
+    return card
+
+
+@pytest.fixture()
+def second_card(db_session, second_customer) -> Card:
+    card = Card(
+        card_id="CARD-CUST00002", customer_id=second_customer.customer_id, last4="9001", status="active"
+    )
+    db_session.add(card)
+    db_session.commit()
+    return card
